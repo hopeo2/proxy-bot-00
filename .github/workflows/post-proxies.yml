@@ -1,0 +1,40 @@
+name: Post proxies every 2 hours
+
+on:
+  schedule:
+    # GitHub Actions uses UTC. Every even hour.
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Never let two scheduled runs overlap and double-post.
+concurrency:
+  group: proxy-post
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Publish a proxy batch
+        env:
+          TGCLOUD_TOKEN: ${{ secrets.TGCLOUD_TOKEN }}
+        run: |
+          if [ -z "${TGCLOUD_TOKEN}" ]; then
+            echo "Missing repository secret TGCLOUD_TOKEN." >&2
+            echo "Get it from @BotFather -> your bot -> Serverless -> CLI Access." >&2
+            exit 1
+          fi
+          npx tgcloud --no-pager run handlers/message '{"cron":true,"trigger":"cron"}'

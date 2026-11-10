@@ -1,0 +1,22 @@
+{
+  "name": "free-proxy-channel-bot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Telegram Serverless bot that publishes verified MTProto proxies to a channel",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node scripts/selftest.mjs",
+    "status": "tgcloud status",
+    "deploy": "tgcloud push",
+    "migrate": "tgcloud migrate",
+    "post": "tgcloud run handlers/message '{\"cron\":true,\"trigger\":\"manual\",\"force\":true}'",
+    "post:cron": "tgcloud run handlers/message '{\"cron\":true,\"trigger\":\"cron\"}'",
+    "post:now": "bash scripts/post-now.sh"
+  },
+  "devDependencies": {
+    "@tgcloud/cli": "^0.2.0"
+  }
+}
