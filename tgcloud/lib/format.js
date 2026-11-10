@@ -130,6 +130,14 @@ export function proxyLink(proxy) {
 }
 
 /**
+ * The same link, escaped for an HTML attribute. Message text is rendered by
+ * every client, unlike inline keyboards, so the body carries its own link.
+ */
+export function proxyLinkHtml(proxy) {
+  return proxyLink(proxy).replace(/&/g, '&amp;');
+}
+
+/**
  * Turn one entry of the repository's proxies.json into the shape the bot uses.
  * Returns null for entries that cannot be turned into a valid proxy link.
  */
@@ -159,7 +167,14 @@ export function normalizeProxy(raw) {
   };
 }
 
-/** One Telegram message (text + inline "Connect" button) for a single proxy. */
+/**
+ * One Telegram message for a single proxy: the details, a tappable "connect"
+ * link inside the text, and the same link as an inline button.
+ *
+ * The text link is the one that matters: some clients do not render inline
+ * keyboards on channel posts (or hide URL buttons they cannot open), and a
+ * message without a visible link leaves the reader with no way to connect.
+ */
 export function formatProxyMessage(proxy, index, total) {
   const uptime = `${(Math.round(proxy.uptime * 1000) / 10).toFixed(1)}%`;
   const network = proxy.asnOrg
@@ -172,6 +187,8 @@ export function formatProxyMessage(proxy, index, total) {
     `⚡ <b>${proxy.rttMs} ms</b> · ✅ <b>${uptime}</b> uptime`,
     `🔐 ${escapeHtml(typeName(proxy.type))} · 🏢 ${network}`,
     `🌐 <code>${escapeHtml(proxy.server)}:${proxy.port}</code>`,
+    '',
+    `🚀 <a href="${proxyLinkHtml(proxy)}">Connect to proxy</a>`,
     '',
     `<i>#proxy #${escapeHtml(proxy.country || 'XX')}</i>`,
   ].join('\n');

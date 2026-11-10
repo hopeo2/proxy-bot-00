@@ -6,6 +6,7 @@ import {
   normalizeProxy,
   proxyKey,
   proxyLink,
+  proxyLinkHtml,
   rankCandidates,
 } from '../tgcloud/lib/format.js';
 
@@ -36,6 +37,17 @@ assert.match(message.text, /1\/10/);
 assert.match(message.text, /Test &amp; Co &lt;x&gt;/);
 assert.match(message.text, /99\.99%|100\.0%/);
 assert.equal(message.reply_markup.inline_keyboard[0][0].url, proxyLink(proxy));
+
+// The connect link must also live in the text: clients that drop inline
+// keyboards would otherwise show a post with no way to connect.
+assert.equal(proxyLinkHtml(proxy), 'https://t.me/proxy?server=1.2.3.4&amp;port=443&amp;secret=abcd');
+assert.ok(
+  message.text.includes(
+    '<a href="https://t.me/proxy?server=1.2.3.4&amp;port=443&amp;secret=abcd">Connect to proxy</a>'
+  ),
+  'message text should carry the connect link as an HTML anchor'
+);
+assert.ok(!/<a href="[^"]*&(?!amp;)/.test(message.text), 'every & in an href must be escaped');
 
 assert.equal(normalizeProxy(null), null);
 assert.equal(normalizeProxy({ server: '', port: 443, secret: 'x' }), null);
