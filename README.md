@@ -3,7 +3,10 @@
 A [Telegram Serverless](https://core.telegram.org/bots/serverless) bot that fetches verified
 MTProto proxies from [0xRadikal/Free-Telegram-Proxy](https://github.com/0xRadikal/Free-Telegram-Proxy)
 and publishes them to **[@free_proxy_00](https://t.me/free_proxy_00)** — one message per proxy,
-with country, ping, uptime, network and a one-tap **Connect** button.
+with country, ping, uptime, network and a one-tap **Connect** link.
+
+> Day-to-day command cheat sheet, gotchas and a recovery checklist live in
+> [NOTES.txt](NOTES.txt). This README is the longer setup walkthrough.
 
 ## How it works
 

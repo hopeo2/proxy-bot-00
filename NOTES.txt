@@ -1,0 +1,339 @@
+================================================================================
+ FREE PROXY BOT — NOTES AND COMMAND REFERENCE
+ Last updated: 2026-11-10
+================================================================================
+
+Keep this file next to the project. It is plain text on purpose: it is the
+thing you read when something breaks six months from now and you have
+forgotten how any of it works.
+
+
+--------------------------------------------------------------------------------
+ 1. QUICK FACTS
+--------------------------------------------------------------------------------
+
+  Bot            @freeproxy00bot        (id 9229767427, name "freeproxy")
+  Channel        @free_proxy_00         (id -1003865158954, "free-proxy 00")
+  GitHub repo    https://github.com/hopeo2/proxy-bot-00          (public)
+  Actions page   https://github.com/hopeo2/proxy-bot-00/actions
+  Secrets page   https://github.com/hopeo2/proxy-bot-00/settings/secrets/actions
+  Workflow file  .github/workflows/post-proxies.yml
+  Platform       Telegram Serverless (app9229767427)
+  Source data    https://github.com/0xRadikal/Free-Telegram-Proxy
+  Admin user id  7289077755  (only this account can /post)
+  Schedule       0 */2 * * *  (UTC — even hours: 00,02,04,... 22)
+  Batch size     10 proxies per run, tier "fast"
+  Cloud revision 3
+
+
+--------------------------------------------------------------------------------
+ 2. THE TWO PLACES YOU DEPLOY TO  (most important thing on this page)
+--------------------------------------------------------------------------------
+
+There are TWO separate deployments. Most confusion comes from doing one and
+not the other.
+
+  A) TELEGRAM CLOUD  ->  npx tgcloud push
+     Makes the live bot (DMs, commands, manual posts) use the new code.
+
+  B) GITHUB          ->  git add -A && git commit -m "..." && git push
+     Makes the every-2-hours schedule use the new code, because the workflow
+     runs the code from the repo.
+
+  If you change something in tgcloud/ and only do (A), the scheduled posts keep
+  running the OLD code. If you only do (B), the live bot keeps the old code.
+
+  Safe order:   npm test  ->  npx tgcloud push  ->  git add -A / commit / push
+
+
+--------------------------------------------------------------------------------
+ 3. DAILY COMMANDS
+--------------------------------------------------------------------------------
+
+  npm test
+      Run the offline unit tests (no network, no deploy).
+
+  npx tgcloud status
+      What is different between your folder and the deployed cloud copy.
+
+  npx tgcloud diff
+      Line-by-line changes.
+
+  npx tgcloud push
+      Deploy code to Telegram. Does NOT touch the database.
+
+  npx tgcloud migrate
+      Apply tgcloud/schema.js changes to the database (interactive).
+
+  npx tgcloud webhook
+      Show the webhook URL and whether it is "in sync" with your handlers.
+
+  npx tgcloud webhook sync
+      Force the platform to re-register the webhook.
+
+  npx tgcloud login
+      Re-link this folder to the bot. Needs the CLI access token from
+      BotFather -> your bot -> Serverless -> CLI Access -> Access token.
+      (Interactive terminal only. Token looks like  app9229767427:AA...)
+
+  npx tgcloud fetch
+      Refresh the local snapshot from the cloud (does not touch your files).
+
+  npx tgcloud pull
+      Download the cloud state over your working files.
+
+  npx tgcloud reset
+      Throw away local changes (restores from the snapshot).
+
+  npx tgcloud --debug webhook
+      Same as above but prints the HTTP requests — use when debugging auth.
+
+  npm run post
+      Post a batch right now, ignoring the cooldown.
+
+  npm run post:cron
+      Run the scheduled job once, respecting the cooldown.
+
+  npm run post:now
+      Same, through scripts/post-now.sh (for local cron).
+
+
+--------------------------------------------------------------------------------
+ 4. RUN SOMETHING IN THE CLOUD WITHOUT DEPLOYING
+--------------------------------------------------------------------------------
+
+  npx tgcloud run <module> '<json>'
+
+  Runs your LOCAL file in the cloud. It does not publish it — good for testing,
+  but remember the cloud still runs the old code until you push.
+
+  Publish a batch now (10 proxies, ignores cooldown):
+    npx tgcloud run handlers/message '{"cron":true,"trigger":"manual","force":true}'
+
+  Publish only 3, ignoring cooldown:
+    npx tgcloud run handlers/message '{"cron":true,"count":3,"force":true}'
+
+  Exactly what the scheduled job runs (respects the cooldown):
+    npx tgcloud run handlers/message '{"cron":true,"trigger":"cron"}'
+
+  Simulate a DM (sends a real message to your account):
+    npx tgcloud run handlers/message '{"text":"/id","chat":{"id":7289077755,"type":"private"},"from":{"id":7289077755,"is_bot":false},"message_id":1,"date":0}'
+
+
+--------------------------------------------------------------------------------
+ 5. COMMANDS INSIDE TELEGRAM
+--------------------------------------------------------------------------------
+
+  Send these to the bot in a private chat (admin only for the posting ones):
+
+  /start  or  /help     What the bot can do + your numeric id
+  /id                   Show your Telegram id (use it to set ADMIN_IDS)
+  /preview [n]          Send n proxies to the DM only, no channel post
+  /post [n]             Publish n proxies to the channel now (ignores cooldown)
+  /stats                Posting statistics
+
+  Inside the channel itself:
+  /post [n]             Same as above, typed as a channel post
+  /proxy [n]            Alias for /post
+                        (the command message is deleted afterwards, so the
+                        channel stays clean)
+
+
+--------------------------------------------------------------------------------
+ 6. GITHUB ACTIONS — HOW THE 2-HOUR SCHEDULE WORKS
+--------------------------------------------------------------------------------
+
+  File: .github/workflows/post-proxies.yml
+  Cron: 0 */2 * * *        (UTC, every even hour)
+
+  The job: checkout -> npm ci -> npx tgcloud run handlers/message '{"cron":true,"trigger":"cron"}'
+  It authenticates with the repository secret  TGCLOUD_TOKEN.
+
+  Run it by hand:  Actions tab -> "Post proxies every 2 hours" -> Run workflow
+  https://github.com/hopeo2/proxy-bot-00/actions/workflows/post-proxies.yml
+
+  Things to remember:
+
+  * The secret must be the CLI ACCESS token (app9229767427:...), NOT the bot's
+    API token. Wrong token = "Unauthorized" in the run log.
+
+  * If the CLI token is ever reissued (BotFather -> Serverless -> CLI Access),
+    update BOTH:  npx tgcloud login  AND the GitHub secret.
+
+  * The workflow runs the code in the repo. Uncommitted or unpushed changes
+    simply do not exist for the schedule.
+
+  * Scheduled workflows in public repos PAUSE after 60 days without a commit.
+    If the channel goes quiet for two months, push any commit (or click
+    "Run workflow") to wake it up.
+
+  * GitHub can delay a scheduled run by a few minutes under load. Normal.
+
+  * Two runs never overlap: the workflow uses  concurrency: proxy-post.
+
+  * A run can finish green and still post nothing — that is the cooldown
+    (see section 8). Check the channel, not just the green checkmark.
+
+
+--------------------------------------------------------------------------------
+ 7. SETTINGS YOU MIGHT WANT TO CHANGE
+--------------------------------------------------------------------------------
+
+  File: tgcloud/lib/config.js      (deploy after editing!)
+
+  CHANNEL          '@free_proxy_00'   where proxies are posted
+  ADMIN_IDS        [7289077755]       who may /post and /preview
+  BATCH_SIZE       10                 proxies per run
+  MIN_GAP_MINUTES  100                cooldown between automatic posts
+  TIER             'fast'             which tier of the source to use
+  MAX_BATCH        25                 hard cap for a single /post
+
+  If you change the channel: add the bot as admin there with
+  "Post messages" and "Delete messages".
+
+  If you change the tier: valid values are fast, resilient, stable, verified
+  (see tgcloud/lib/proxy-source.js, which also falls back to the broader tiers
+  when the chosen one is empty).
+
+
+--------------------------------------------------------------------------------
+ 8. WHY A RUN MAY POST NOTHING (cooldown)
+--------------------------------------------------------------------------------
+
+  MIN_GAP_MINUTES = 100. An automatic (cron) run that starts less than 100
+  minutes after the previous post skips silently:
+
+      { ok: true, skipped: true, reason: 'cooldown', waitMinutes: N }
+
+  That is deliberate: a delayed or retried schedule must not double-post.
+  A manual /post or  force:true  ignores it.
+
+  Example: posted 19:47 -> the 20:00 run skips -> the 22:00 run posts.
+
+
+--------------------------------------------------------------------------------
+ 9. WHAT THE BOT ACTUALLY DOES
+--------------------------------------------------------------------------------
+
+  1. Fetch the tier JSON from the source repo (with fallback tiers).
+  2. Drop entries that cannot form a valid proxy link.
+  3. Rank: never-posted proxies first (best RTT), then the ones posted longest
+     ago. This rotates the list instead of reposting the same servers.
+  4. Send ONE Telegram message per proxy to the channel:
+        text  = country, index/total, RTT, uptime, type, ASN, server:port
+        link  = tappable "Connect to proxy" anchor inside the text
+        button= same link as an inline button
+  5. Record it in the database (posted_proxies, settings, post_log).
+
+  The link in the TEXT is the important one: inline keyboard buttons are drawn
+  by the client, and some clients do not render them on channel posts. A link
+  in the message body is visible everywhere. Do not remove it.
+
+  Link format:
+    https://t.me/proxy?server=<host>&port=<port>&secret=<secret>
+
+
+--------------------------------------------------------------------------------
+10. DATABASE
+--------------------------------------------------------------------------------
+
+  File: tgcloud/schema.js
+    posted_proxies   one row per proxy ever published (rotation state)
+    settings         key/value, e.g. last_post_at
+    post_log         one row per publishing attempt
+
+  Rules:
+  * Deploying never changes the database. After editing schema.js run
+    npx tgcloud push  AND  npx tgcloud migrate.
+  * Nothing is dropped by deleting a declaration. Use .deprecated('reason').
+  * No foreign keys (the runtime has them off). Enforce integrity in code.
+  * Every db call is async — always await.
+
+
+--------------------------------------------------------------------------------
+11. TROUBLESHOOTING
+--------------------------------------------------------------------------------
+
+  "The bot does not answer in DM"
+    npx tgcloud webhook
+      - "in sync"        -> the webhook is fine; the handler threw an error
+                            (test with npx tgcloud run ..., read the error)
+      - "Unauthorized"   -> the platform's stored BOT token is rejected.
+                            Fix: BotFather -> your bot -> Serverless -> OFF
+                            then ON again (this re-registers the current bot
+                            token). If it prints a new CLI access token, run
+                            npx tgcloud login and update the GitHub secret.
+      - not in sync      -> npx tgcloud webhook sync
+
+  A GitHub run fails at "Publish a proxy batch"
+    - Missing/incorrect TGCLOUD_TOKEN secret (use the CLI access token).
+    - Or the bot token problem above — check with npx tgcloud webhook.
+
+  Posts stop after working fine for weeks
+    - 60-day inactivity pause on scheduled workflows -> make any commit.
+    - Or the token was rotated in BotFather.
+
+  "Invalid module name: handlers/xyz"
+    handlers/ files must be named after REAL Telegram update types
+    (message, channel_post, callback_query, inline_query, ...). Anything else
+    is rejected by the platform. Use endpoints/ for ad-hoc diagnostics.
+
+  "chat_id is empty" / BotApiError 400
+    Pass Bot API parameters as an object: api.getChat({ chat_id: '@name' }),
+    not api.getChat('@name').
+
+  Where is the token stored locally?
+    .tgcloud/credentials — machine state, gitignored. Never commit it and
+    never paste it anywhere public. To get a fresh copy, ask BotFather.
+
+
+--------------------------------------------------------------------------------
+12. ALTERNATIVE TO GITHUB ACTIONS: LOCAL CRON
+--------------------------------------------------------------------------------
+
+  scripts/post-now.sh runs one batch using the local .tgcloud credentials.
+  Add to crontab (crontab -e), absolute paths required:
+
+    0 */2 * * * /run/media/hope/hope/yoo/javascript/telegram-serverless-bot00/scripts/post-now.sh >> /tmp/proxy-post.log 2>&1
+
+  Cron's PATH is minimal. If node comes from nvm/asdf, add its bin directory
+  to the crontab PATH. Do not run BOTH GitHub Actions and local cron — you
+  would get two batches per slot (the cooldown would block one, but it is
+  needless noise).
+
+
+--------------------------------------------------------------------------------
+13. PROJECT LAYOUT
+--------------------------------------------------------------------------------
+
+  tgcloud/schema.js              database tables
+  tgcloud/lib/config.js          channel, admins, batch size, cooldown, tier
+  tgcloud/lib/format.js          pure formatting helpers (unit-tested)
+  tgcloud/lib/proxy-source.js    fetch + parse the tier JSON
+  tgcloud/lib/publisher.js       fetch -> rank -> send -> record
+  tgcloud/handlers/message.js    DMs + the {cron:true} entry point
+  tgcloud/handlers/channel_post.js   /post typed inside the channel
+  scripts/selftest.mjs           npm test
+  scripts/post-now.sh            local cron entry point
+  .github/workflows/post-proxies.yml   the 2-hour schedule
+  README.md                      longer setup walkthrough
+  NOTES.txt                      this file
+
+  Only .js files under tgcloud/ are deployed. At runtime a module can import
+  only the SDK ('sdk', 'sdk/db') and other project modules by relative path
+  WITH the .js extension. No npm packages, no filesystem.
+
+
+--------------------------------------------------------------------------------
+14. WHEN YOU COME BACK AFTER A LONG BREAK — CHECKLIST
+--------------------------------------------------------------------------------
+
+  [ ] npx tgcloud status            -> clean? cloud revision as expected?
+  [ ] npx tgcloud webhook           -> "in sync"?
+  [ ] open https://t.me/s/free_proxy_00 -> recent posts, with links?
+  [ ] open the Actions page         -> any red runs? last run recent?
+  [ ] send /id to the bot           -> does it answer?
+  [ ] npx tgcloud run handlers/message '{"cron":true,"count":1,"force":true}'
+                                    -> posts one proxy, proves the whole path
+
+================================================================================
